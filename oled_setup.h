@@ -6,10 +6,6 @@
 #include <Wire.h>
 #endif
 
-#define SDA D1
-#define SCL D2
-
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);     // 0.91吋長型螢幕使用
 
 class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
     private:
@@ -36,7 +32,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
         };
         _text_inf *text_inf=new _text_inf[0];
     public:
-        Oled(const int sda_p=D1,const int scl_p=D2,int w=128,int h=32):
+        Oled(const int sda_p=2,const int scl_p=0,int w=128,int h=32):
             U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ scl_p, /* data=*/ sda_p)     // 0.91吋長型螢幕使用
         {
             width=w;

@@ -12,6 +12,7 @@ int switch_mode_sec=5; //second(s)
 #include "button_setup.h"
 #include "oled_setup.h"
 #include "oled_pic.h"
+#include "oled_datashow.h"
 #include "poweron.h"
 #include "wifi_setup.h"
 #include "time_server.h"
@@ -32,7 +33,6 @@ void setup(void) {
     pinMode(rstread,INPUT_PULLUP);
     Serial.begin(9600);
     SPIFFS.begin();
-    u8g2.begin();
     powerondisplay();
     wifi_try();
     delay(3000);
