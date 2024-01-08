@@ -24,6 +24,8 @@ bool resetFlag = false;
 
 int restarttime=12; //hour(s)
 
+Oled oled1;
+
 
 
 void setup(void) {

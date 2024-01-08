@@ -10,26 +10,113 @@
 #define SCL D2
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);     // 0.91吋長型螢幕使用
-int imgWidth=128;
-int imgHeight=32;
 
-void outputoled_pic(const unsigned char input_pic[],int start_x=0,int start_y=0,int width=imgWidth,int height=imgHeight){
-    u8g2.clearBuffer();                    // clear the internal memory
-    u8g2.drawXBMP(start_x,start_y, width, height, input_pic);    //繪圖
-    u8g2.sendBuffer();                    // transfer internal memory to the display
-}
-void outputoled_txt(String wordin,int start_x=0,int start_y=10){
-    String wordin_arr[charnum(wordin,'\n')+1];
-    fillarray(wordin_arr,wordin,'\n');
+class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
+    private:
+        int addr;
+        int scl_pin;
+        int sda_pin;
+        int width;
+        int height;
+        
+        int scroll_time=45;
+        
 
-    u8g2.clearBuffer();                    // clear the internal memory
-    u8g2.setFont(u8g2_font_ncenB08_tr);  // choose a suitable font
-    int arrlen=sizeof(wordin_arr)/sizeof(wordin_arr[0]);
-    for(int a=0;a<arrlen;a++){
-        //Serial.println("u8g2.drawStr");
-        //Serial.println(wordin_arr[a].c_str());
-        u8g2.drawStr(start_x,start_y,wordin_arr[a].c_str());
-        start_y+=11;
-    }
-    u8g2.sendBuffer();                    // transfer internal memory to the display
-}
+        String all_text="";
+
+        int text_num=0;
+        struct _text_inf{
+            String text;
+            uint8_t *type;
+            int nowtime=millis();
+            int start_x=0;
+            int xlen=0;
+            int xtmp;
+            int start_y=10;
+        };
+        _text_inf *text_inf=new _text_inf[0];
+    public:
+        Oled(const int sda_p=D1,const int scl_p=D2,int w=128,int h=32):
+            U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ scl_p, /* data=*/ sda_p)     // 0.91吋長型螢幕使用
+        {
+            width=w;
+            height=h;
+            sda_pin=sda_p;
+            scl_pin=scl_p;
+            begin();
+        }
+        void data_init(){
+            text_num=0;
+            text_inf=new _text_inf[0];
+        }
+        void del_data(){
+            delete[] text_inf;
+            data_init();
+        }
+        void show(int delaytime=1){
+            int tn=millis();
+            while(millis()-tn<delaytime){
+                clearBuffer();
+                for(int a=0;a<text_num;a++){
+                    setFont(text_inf[a].type);
+                    if(text_inf[a].xlen==0){
+                        text_inf[a].xlen=getStrWidth(text_inf[a].text.c_str());
+                    }
+                    if(millis()-text_inf[a].nowtime>scroll_time){
+                        text_inf[a].nowtime=millis();
+                        if(text_inf[a].xlen>width){
+                            if(text_inf[a].xlen+text_inf[a].xtmp-(width-10)<=0){
+                                text_inf[a].xtmp=0;
+                            }else{
+                                text_inf[a].xtmp-=1;
+                            }
+                        }
+                    }
+                    drawStr(text_inf[a].xtmp,text_inf[a].start_y,text_inf[a].text.c_str());
+                    sendBuffer();
+                    delay(1);
+                }
+            }
+        }
+        void pic(const unsigned char input_pic[],int start_x=0,int start_y=0){
+            clearBuffer();                    // clear the internal memory
+            drawXBMP(start_x,start_y, width, height, input_pic);    //繪圖
+            sendBuffer();                    // transfer internal memory to the display
+        }
+        void add_data(String t,const uint8_t *ty,int start_x,int start_y){
+            _text_inf *tmp=new _text_inf[text_num+1];
+            for(int a=0;a<text_num;a++){
+                tmp[a]=text_inf[a];
+            }
+            tmp[text_num].text=t;
+            tmp[text_num].start_x=start_x;
+            //tmp[text_num].xlen=t.length()*6;
+            tmp[text_num].xtmp=0;
+            tmp[text_num].start_y=start_y;
+            tmp[text_num].type=const_cast<uint8_t*>(ty);
+            text_num+=1;
+            delete[] text_inf;
+            text_inf=new _text_inf[text_num];
+            for(int a=0;a<text_num;a++){
+                text_inf[a]=tmp[a];
+            }
+            delete[] tmp;
+        }
+        void txt(String wordin,int start_x=0,int start_y=10){
+            if(all_text==wordin){
+                return;
+            }
+            all_text=wordin;
+            del_data();
+            String wordin_arr[charnum(wordin,'\n')+1];
+            fillarray(wordin_arr,wordin,'\n');
+            int arrlen=sizeof(wordin_arr)/sizeof(wordin_arr[0]);
+            for(int a=0;a<arrlen;a++){
+                add_data(wordin_arr[a],u8g2_font_ncenB08_tr,start_x,start_y);
+                start_y+=11;
+            }
+        }
+        ~Oled(){
+            delete[] text_inf;
+        }
+};
