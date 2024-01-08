@@ -15,7 +15,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
         int width;
         int height;
         
-        int scroll_time=45;
+        int scroll_time=20;
         
 
         String all_text="";
@@ -28,6 +28,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
             int start_x=0;
             int xlen=0;
             int xtmp;
+            int fix=0;
             int start_y=10;
         };
         _text_inf *text_inf=new _text_inf[0];
@@ -68,18 +69,27 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
                             }
                         }
                     }
-                    drawStr(text_inf[a].xtmp,text_inf[a].start_y,text_inf[a].text.c_str());
-                    sendBuffer();
+                    if(text_inf[a].fix){
+                        drawStr(text_inf[a].start_x,text_inf[a].start_y,text_inf[a].text.c_str());
+                    }else{
+                        drawStr(text_inf[a].xtmp,text_inf[a].start_y,text_inf[a].text.c_str());
+                    }
                     delay(1);
                 }
+                sendBuffer();
             }
+        }
+        int get_word_width(String t,const uint8_t *ty){
+            setFont(ty);
+            int outp=getUTF8Width(t.c_str());
+            return(outp);
         }
         void pic(const unsigned char input_pic[],int start_x=0,int start_y=0){
             clearBuffer();                    // clear the internal memory
             drawXBMP(start_x,start_y, width, height, input_pic);    //繪圖
             sendBuffer();                    // transfer internal memory to the display
         }
-        void add_data(String t,const uint8_t *ty,int start_x,int start_y){
+        void add_data(String t,const uint8_t *ty,int start_x,int start_y,int fix=0){
             _text_inf *tmp=new _text_inf[text_num+1];
             for(int a=0;a<text_num;a++){
                 tmp[a]=text_inf[a];
@@ -90,6 +100,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
             tmp[text_num].xtmp=0;
             tmp[text_num].start_y=start_y;
             tmp[text_num].type=const_cast<uint8_t*>(ty);
+            tmp[text_num].fix=fix;
             text_num+=1;
             delete[] text_inf;
             text_inf=new _text_inf[text_num];
@@ -98,7 +109,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
             }
             delete[] tmp;
         }
-        void txt(String wordin,int start_x=0,int start_y=10){
+        void txt(String wordin,int start_x=0,int start_y=10,int fix=0){
             if(all_text==wordin){
                 return;
             }
@@ -108,7 +119,7 @@ class Oled:public U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C{
             fillarray(wordin_arr,wordin,'\n');
             int arrlen=sizeof(wordin_arr)/sizeof(wordin_arr[0]);
             for(int a=0;a<arrlen;a++){
-                add_data(wordin_arr[a],u8g2_font_ncenB08_tr,start_x,start_y);
+                add_data(wordin_arr[a],u8g2_font_ncenB08_tr,start_x,start_y,fix);
                 start_y+=11;
             }
         }

@@ -27,35 +27,28 @@ bool resetFlag = false;
 
 int restarttime=12; //hour(s)
 
-
-
-
-
 void setup(void) {
-    pinMode(rstread,INPUT_PULLUP);
+    pinMode(rstread,INPUT);
     Serial.begin(115200);
     SPIFFS.begin();
-    Serial.println("PowerOn");
     powerondisplay();
-    Serial.println("disp");
     wifi_try();
-    Serial.println("wifi_try()");
     delay(3000);
 }
 
 void loop(void) { 
     oled1.show();
-    Serial.println("oled.show");
     if(millis()>=restarttime*3600*1000){
       ESP.restart();
     }
     if(!connect_suc){
         server.handleClient();
-        Serial.println("wifi not connected");
+        //Serial.println("wifi not connected");
     }
     
     unsigned long startResetTime = millis();
-    while (digitalRead(rstread) == LOW) {
+    Serial.println(digitalRead(rstread));
+    while (digitalRead(rstread) == 1) {
         if (millis() - startResetTime >= (resetDuration * 1000)) {
             resetFlag = true;
             break;
@@ -75,7 +68,6 @@ void loop(void) {
         }else if(tmp1==0){
           gettime(true);
         }
-        delay(100);
     }
     
     

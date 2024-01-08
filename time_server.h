@@ -12,9 +12,8 @@ void addsecond();
 void oled_outp_datetime();
 
 void gettime(bool oled_out,bool force=false){
-  //Serial.println("gettime()");
     if((datetime_f_t!=""&&millis()-lastchecktime<timecheckduration*1000)&&!force){
-      if(millis()-lastchecksec>=955){//caculating runtime delay, generally 1000 milliseconds
+      if(millis()-lastchecksec>=1020){//caculating runtime delay, generally 1000 milliseconds
         addsecond();
         lastchecksec=millis();
         if(oled_out){
@@ -96,17 +95,21 @@ void addsecond(){
 }
 
 void oled_outp_datetime(){
+  static int screenWidth=-1;
+  static int screenHeight=-1;
   oled1.del_data();
-  int screenWidth = oled1.getWidth();
-  int screenHeight = oled1.getHeight();
+  if(screenHeight==-1){
+    screenWidth = oled1.getWidth();
+    screenHeight = oled1.getHeight();
+  }
 
-  int width_t=oled1.getUTF8Width(datetime_f_t.c_str());
+  int width_t=oled1.get_word_width(datetime_f_t,u8g2_font_logisoso18_tr);
   int x_t=(screenWidth-width_t)/2;
   int y_t=18;
-  oled1.add_data(datetime_f_t,u8g2_font_logisoso18_tr,x_t,y_t);
+  oled1.add_data(datetime_f_t,u8g2_font_logisoso18_tr,x_t,y_t,/*fix = */1);
 
-  int width_d=oled1.getUTF8Width(datetime_f_d.c_str());
+  int width_d=oled1.get_word_width(datetime_f_d,u8g2_font_7x14B_tr);
   int x_d=(screenWidth-width_d)/2;
   int y_d=screenHeight;
-  oled1.add_data(datetime_f_d,u8g2_font_7x14B_tr,x_d,y_d);
+  oled1.add_data(datetime_f_d,u8g2_font_7x14B_tr,x_d,y_d,/*fix = */1);
 }
