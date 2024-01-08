@@ -1,0 +1,392 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <FS.h>
+
+String ssid;
+String password;
+
+#define ledin LED_BUILTIN
+#define rstread 3
+#define relaypin 0
+
+const int resetDuration = 3; // 按下RST鍵3秒後重設WiFi
+unsigned long resetTime = 0;
+bool resetFlag = false;
+bool firstsetup = false;
+
+int connect_suc=0;
+ESP8266WebServer server(80);
+
+/*巴法雲伺服器連接設定*/
+#define server_ip "bemfa.com" //巴法云服务器地址默认即可
+#define server_port "8344" //服务器端口，tcp创客云端口8344
+String UID; //用户私钥，可在控制台获取,修改为自己的UID
+String TOPIC; //主题名字，可在控制台新建
+/*String UID = "fc2043b2e64ace0c310de75433cfd49a";  //用户私钥，可在控制台获取,修改为自己的UID
+String TOPIC = "relaytest6274378";         //主题名字，可在控制台新建*/
+
+//最大字节数
+#define MAX_PACKETSIZE 512
+//设置心跳值60s
+#define KEEPALIVEATIME 60*1000
+//tcp客户端相关初始化，默认即可
+WiFiClient TCPclient;
+String TcpClient_Buff = "";//初始化字符串，用于接收服务器发来的数据
+unsigned long TcpClient_preTick = 0;
+unsigned long preHeartTick = 0;//心跳
+unsigned long preTCPStartTick = 0;//连接
+bool preTCPConnected = false;
+//相关函数初始化
+//连接WIFI
+void doWiFiTick();
+void startSTA();
+
+//TCP初始化连接
+void doTCPClientTick();
+void startTCPClient();
+void sendtoTCPServer(String p);
+
+//relay控制函数，具体函数内容见下方
+void turnOnRelay();
+void turnOffRelay();
+
+
+
+/*
+   发送数据到TCP服务器
+*/
+void sendtoTCPServer(String p) {
+  if (!TCPclient.connected())
+  {
+    return;
+  }
+  TCPclient.print(p);
+}
+
+
+/*
+   初始化和服务器建立连接
+*/
+void startTCPClient() {
+  if (TCPclient.connect(server_ip, atoi(server_port))) {
+
+    String tcpTemp = ""; //初始化字符串
+    tcpTemp = "cmd=1&uid=" + UID + "&topic=" + TOPIC + "\r\n"; //构建订阅指令
+    sendtoTCPServer(tcpTemp); //发送订阅指令
+    tcpTemp = ""; //清空
+
+
+
+    preTCPConnected = true;
+    preHeartTick = millis();
+    TCPclient.setNoDelay(true);
+  }
+  else {
+    TCPclient.stop();
+    preTCPConnected = false;
+  }
+  preTCPStartTick = millis();
+}
+
+
+/*
+   检查数据，发送心跳
+*/
+void doTCPClientTick() {
+  //检查是否断开，断开后重连
+  if (!TCPclient.connected()) {//断开重连
+    if (preTCPConnected == true) {
+      preTCPConnected = false;
+      preTCPStartTick = millis();
+      TCPclient.stop();
+    }
+    else if (millis() - preTCPStartTick > 1 * 1000){
+      startTCPClient();
+    }
+      
+  }
+  else
+  {
+    if (TCPclient.available()) {//收数据
+      while (TCPclient.available() > 0)
+      {
+        char c = TCPclient.read();
+        TcpClient_Buff += c;
+      }    
+      String getMsg=TcpClient_Buff.substring(TcpClient_Buff.lastIndexOf("&msg")+5,TcpClient_Buff.length()-2);             
+      TcpClient_preTick = millis();
+      if (getMsg  == "on") {     //如果是消息==打开
+        turnOnRelay();
+      } else if (getMsg == "off") { //如果是消息==关闭
+        turnOffRelay();
+      }
+      preHeartTick = millis();
+    }
+    if (millis() - preHeartTick >= KEEPALIVEATIME) { //保持心跳
+      preHeartTick = millis();
+      sendtoTCPServer("ping\r\n"); //发送心跳，指令需\r\n结尾，详见接入文档介绍
+    }
+  }
+
+  TcpClient_Buff = "";
+
+}
+
+/*
+   初始化wifi连接
+*/
+void startSTA() {
+  WiFi.disconnect();
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+}
+
+void doWiFiTick() {
+  static bool startSTAFlag = true;
+  static bool taskStarted = false;
+  static uint32_t lastWiFiCheckTick = 0;
+
+  if (!startSTAFlag) {
+    startSTAFlag = true;
+    startSTA();
+  }
+
+  //未连接1s重连
+  if ( WiFi.status() != WL_CONNECTED ) {
+    if (millis() - lastWiFiCheckTick > 1000) {
+      lastWiFiCheckTick = millis();
+    }
+  }
+  //连接成功建立
+  else {
+    if (taskStarted == false) {
+      taskStarted = true;
+      startTCPClient();
+    }
+  }
+}
+
+void handleRoot() {
+  String html = "<meta charset='utf-8'><html><body>";
+  html += "<h1>WiFi設定</h1>";
+  html += "<form method='POST' action='/save'>";
+  html += "WiFi名稱： <input type='text' name='ssid'><br>";
+  html += "WiFi密碼： <input type='password' name='password'><br>";
+  html += "巴法雲設備(主題)名稱： <input type='text' name='bemfa_topic' value='";
+  html += TOPIC;
+  html += "'><br>";
+  html += "巴法雲帳號金鑰： <input type='password' name='bemfa_uid' value='";
+  html += UID;
+  html += "'><br>";
+  html += "<input type='submit' value='Save'>";
+  html += "</form>";
+  html += "<h1>直接控制</h1>";
+  html += "<h2><a href='/on'>開啟</a> <a href='/off'>關閉</a></h2>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+
+void handleRoot2() {
+  String html = "<meta charset='utf-8'><html><body>";
+  html += "<h1>繼電器開啟/關閉</h1>";
+  html += "<h2><a href='/on'>開啟</a> <a href='/off'>關閉</a></h2>";
+  html += "</html>";
+  server.send(200, "text/html", html);
+}
+
+void handleSave() {
+  String ssid = server.arg("ssid");
+  String password = server.arg("password");
+  String bemfa_uid = server.arg("bemfa_uid");
+  String bemfa_topic = server.arg("bemfa_topic");
+
+  File bemfa_uid_file = SPIFFS.open("/bemfa_uid.txt", "w");
+  if(bemfa_uid_file){
+    bemfa_uid_file.print(bemfa_uid);
+    bemfa_uid_file.close();
+  }
+  File bemfa_topic_file = SPIFFS.open("/bemfa_topic.txt", "w");
+  if(bemfa_topic_file){
+    bemfa_topic_file.print(bemfa_topic);
+    bemfa_topic_file.close();
+  }
+  
+  File file = SPIFFS.open("/wifi_ssid.txt", "w");
+  if (file) {
+    file.print(ssid);
+    file.close();
+  }
+  File file2 = SPIFFS.open("/wifi_pass.txt", "w");
+  if (file2) {
+    file2.print(password);
+    file2.close();
+  }
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.begin(ssid, password);
+  int timeout=0;
+  int failedtoconnect=0;
+  while (WiFi.status() != WL_CONNECTED) {
+    if(timeout>=50){
+      setup_wifi();
+      failedtoconnect=1;
+      break;
+    }
+    led_blink(200);
+    timeout++;
+  }
+  if(!failedtoconnect){
+    String html="<meta charset='utf-8'><html>設定成功！<br/>IP位址： <a href='http://";
+    html+=WiFi.localIP().toString();
+    html+="' target='_blank'>";
+    html+=WiFi.localIP().toString();
+    html+="</a>";
+    html+="<br/>請截圖妥善保存，以免找不到IP位址";
+    html+="<br/>請至巴法雲平台進行確認(輸入on開啟繼電器，輸入off關閉繼電器)</html>";
+    server.send(200, "text/html", html);
+    delay(1000);
+    ESP.restart();
+  }
+  server.send(200, "text/plain", "Failed!");
+  firstsetup=true;
+  setup();
+}
+
+void handleon(){
+  turnOnRelay();
+  server.send(200, "text/html", "<meta charset='utf-8'><html>開關已開啟！<br/><a href='/'>回首頁</a></html>");
+}
+
+void handleoff(){
+  turnOffRelay();
+  server.send(200, "text/html", "<meta charset='utf-8'><html>開關已關閉！<br/><a href='/'>回首頁</a></html>");
+}
+
+//打開繼電器
+void turnOnRelay() {
+  digitalWrite(relaypin, HIGH);
+}
+//關閉繼電器
+void turnOffRelay() {
+  digitalWrite(relaypin, LOW);
+}
+
+
+void handleip(){
+  String html="<meta charset='utf-8'><html>";
+  String ip=WiFi.localIP().toString();
+  html +=ip;
+  html+="</html>";
+  server.send(200, "text/html", html);
+}
+
+void led_blink(int freq){
+  digitalWrite(ledin,HIGH);
+  delay(freq/2);
+  digitalWrite(ledin,LOW);
+  delay(freq/2);
+}
+
+void setup_wifi(){
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("Esp01_switch", "");
+  server.begin();
+  server.on("/", handleRoot);
+  server.on("/save", handleSave);
+  server.on("/on",handleon);
+  server.on("/off",handleoff);
+  server.on("/ip",handleip);
+}
+
+void resetWifiCredentials() {
+  SPIFFS.remove("/wifi_ssid.txt");
+  SPIFFS.remove("/wifi_pass.txt");
+  ESP.restart();
+}
+
+void setup() {
+  SPIFFS.begin();
+  pinMode(relaypin, OUTPUT); // GPIO 0 for controlling relay
+  digitalWrite(relaypin, LOW); // Default relay OFF
+  pinMode(ledin,OUTPUT);
+  pinMode(rstread,INPUT_PULLUP);
+
+  File bemfa_uid_file = SPIFFS.open("/bemfa_uid.txt", "r");
+  if(bemfa_uid_file){
+    UID=bemfa_uid_file.readStringUntil('\n');
+  }
+  File bemfa_topic_file = SPIFFS.open("/bemfa_topic.txt", "r");
+  if(bemfa_topic_file){
+    TOPIC=bemfa_topic_file.readStringUntil('\n');
+  }
+
+  File file = SPIFFS.open("/wifi_ssid.txt", "r");
+  if (file) {
+    WiFi.mode(WIFI_STA);
+    
+    ssid = file.readStringUntil('\n');
+    file.close();
+    File file2 = SPIFFS.open("/wifi_pass.txt", "r");
+    if(file2){
+      password = file2.readStringUntil('\n');
+      file2.close();
+    }
+
+    WiFi.begin(ssid, password);
+    int timeout=0;
+    int failedtoconnect=0;
+    while (WiFi.status() != WL_CONNECTED) {
+      if(timeout>=50){
+        setup_wifi();
+        failedtoconnect=1;
+        break;
+      }
+      led_blink(200);
+      timeout++;
+    }
+    if(!failedtoconnect){
+      digitalWrite(ledin,LOW);
+      connect_suc=1;
+    }
+    
+  } else {
+    setup_wifi();
+  }
+
+  
+}
+
+void loop() {
+  
+  if(!connect_suc){
+    server.handleClient();
+    led_blink(1000);
+  }else if(!preTCPConnected){
+    led_blink(200);
+    led_blink(1000);
+  }
+
+  unsigned long startResetTime = millis();
+  while (digitalRead(rstread) == LOW) {
+    if (millis() - startResetTime >= (resetDuration * 1000)) {
+      digitalWrite(ledin,HIGH);
+      resetFlag = true;
+      break;
+    }
+    delay(10);
+  }
+
+  // If resetFlag is true, then reset WiFi credentials
+  if (resetFlag) {
+    resetWifiCredentials();
+  }
+  // Your relay control logic can be implemented here.
+
+  if(connect_suc){
+    doWiFiTick();
+    doTCPClientTick();
+    delay(1000);
+  }
+
+  
+}
