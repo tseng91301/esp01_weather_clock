@@ -96,22 +96,17 @@ void addsecond(){
 }
 
 void oled_outp_datetime(){
-  u8g2.clearBuffer();
+  oled1.del_data();
+  int screenWidth = oled1.getWidth();
+  int screenHeight = oled1.getHeight();
 
-  int screenWidth = u8g2.getWidth();
-  int screenHeight = u8g2.getHeight();
-
-  u8g2.setFont(u8g2_font_logisoso18_tr);
-  int width_t=u8g2.getUTF8Width(datetime_f_t.c_str());
+  int width_t=oled1.getUTF8Width(datetime_f_t.c_str());
   int x_t=(screenWidth-width_t)/2;
   int y_t=18;
-  u8g2.drawStr(x_t,y_t,datetime_f_t.c_str());
+  oled1.add_data(datetime_f_t,u8g2_font_logisoso18_tr,x_t,y_t);
 
-  u8g2.setFont(u8g2_font_7x14B_tr);
-  int width_d=u8g2.getUTF8Width(datetime_f_d.c_str());
+  int width_d=oled1.getUTF8Width(datetime_f_d.c_str());
   int x_d=(screenWidth-width_d)/2;
   int y_d=screenHeight;
-  u8g2.drawStr(x_d,y_d,datetime_f_d.c_str());
-
-  u8g2.sendBuffer();
+  oled1.add_data(datetime_f_d,u8g2_font_7x14B_tr,x_d,y_d);
 }

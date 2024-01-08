@@ -79,7 +79,8 @@ void handleSave() {
     for(int a=0;a<timeout%4;a++){
       connectingtxt+=".";
     }
-    outputoled_txt(connectingtxt);
+    oled1.txt(connectingtxt);
+    oled1.show();
     delay(400);
     timeout++;
   }
@@ -92,7 +93,8 @@ void handleSave() {
     html+="<br/>請截圖妥善保存，以免找不到IP位址";
     server.send(200, "text/html", html);
     delay(1000);
-    outputoled_txt("Connected! Rebooting...");
+    oled1.txt("Connected! Rebooting...");
+    oled1.show();
     delay(1000);
     ESP.restart();
   }
@@ -109,7 +111,8 @@ void handleip(){
 }
 
 void setup_wifi(){
-    outputoled_txt("Please setup WiFi!");
+    oled1.txt("Please setup WiFi!");
+    oled1.show();
     WiFi.mode(WIFI_AP);
     WiFi.softAP("Esp01 weather clock 001", "");
     server.begin();
@@ -149,12 +152,14 @@ void wifi_try(){
             for(int a=0;a<timeout%4;a++){
               connectingtxt+=".";
             }
-            outputoled_txt(connectingtxt);
+            oled1.txt(connectingtxt);
+            oled1.show();
             delay(400);
             timeout++;
         }
         if(!failedtoconnect){
-            outputoled_txt("WiFi connected!\nIP: "+WiFi.localIP().toString());
+            oled1.txt("WiFi connected!\nIP: "+WiFi.localIP().toString());
+            oled1.show();
             connect_suc=1;
         }
         

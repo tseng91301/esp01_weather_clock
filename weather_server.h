@@ -44,25 +44,12 @@ void oled_outp_weather_daybig(){
     return;
   }
   lastdumpweather=millis();
-  u8g2.clearBuffer();
+  oled1.del_data();
 
-  int screenWidth = u8g2.getWidth();
-  int screenHeight = u8g2.getHeight();
+  oled1.add_data(weather_des,u8g2_font_6x12_tf,0,12);
 
-  
-  u8g2.setFont(u8g2_font_6x12_tf);
-  u8g2.drawStr(0,12,weather_des.c_str());
-
-  //u8g2.setFont(u8g2_font_10x20_tf);
   String t_h_r="T:"+weather_temp_c+"dC H:"+weather_humidity+"% R:"+weather_chance_of_rain+"%";
-  //String t_h_r=weather_temp_c+"dC "+"H:"+weather_humidity+"% R:"+weather_chance_of_rain+"%";
-  //Serial.println(t_h_r);
-  
-  u8g2.drawStr(0,23,t_h_r.c_str());
+  oled1.add_data(t_h_r,u8g2_font_6x12_tf,0,23);
 
-  //Serial.println(weather_location);
-  //u8g2.setFont(u8g2_font_8x13B_tf);
-  u8g2.drawStr(0,32,weather_location.c_str());
-
-  u8g2.sendBuffer();
+  oled1.add_data(weather_location,u8g2_font_6x12_tf,0,32);
 }

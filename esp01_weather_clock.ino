@@ -10,9 +10,11 @@ int switch_mode_sec=5; //second(s)
 
 #include "bottom_func.h"
 #include "button_setup.h"
+
 #include "oled_setup.h"
 #include "oled_pic.h"
-#include "oled_datashow.h"
+Oled oled1;
+
 #include "poweron.h"
 #include "wifi_setup.h"
 #include "time_server.h"
@@ -25,25 +27,31 @@ bool resetFlag = false;
 
 int restarttime=12; //hour(s)
 
-Oled oled1;
+
 
 
 
 void setup(void) {
     pinMode(rstread,INPUT_PULLUP);
-    Serial.begin(9600);
+    Serial.begin(115200);
     SPIFFS.begin();
+    Serial.println("PowerOn");
     powerondisplay();
+    Serial.println("disp");
     wifi_try();
+    Serial.println("wifi_try()");
     delay(3000);
 }
 
 void loop(void) { 
+    oled1.show();
+    Serial.println("oled.show");
     if(millis()>=restarttime*3600*1000){
       ESP.restart();
     }
     if(!connect_suc){
         server.handleClient();
+        Serial.println("wifi not connected");
     }
     
     unsigned long startResetTime = millis();
